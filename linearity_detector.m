@@ -8,6 +8,7 @@ rowStart = 2;               % 数据起始行（跳过表头）
 % ---- 线性区检测参数 ----
 R2Thresh = 0.9999;            % 线性拟合 R² 阈值，越高越严格（1=完美直线）
 minLinearLen = 10;           % 最小线性区长度（点数），过短不视为线性区
+minVoltageRange = 0.1;       % 最小电压变化量（V），排除平坦/近零伪线性段
 smoothWin = 5;               % 差值/斜率平滑窗口（奇数），仅用于展示
 
 % ---- 绘图选项 ----
@@ -65,6 +66,7 @@ bestLen = 0;
 bestStart = 1;
 bestEnd = 0;
 totalChecked = 0;
+flatSkipped = 0;
 
 for i = 1:(n - minLinearLen)
   if (n - i + 1) < bestLen
@@ -79,6 +81,13 @@ for i = 1:(n - minLinearLen)
 
     tv = t(i:j);
     vv = v(i:j);
+
+    % 跳过电压变化过小的平坦段（近零区伪线性）
+    if max(vv) - min(vv) < minVoltageRange
+      flatSkipped = flatSkipped + 1;
+      continue;
+    end
+
     totalChecked = totalChecked + 1;
 
     coeff = polyfit(tv, vv, 1);
@@ -104,7 +113,7 @@ for i = 1:(n - minLinearLen)
   end
 end
 
-fprintf('扫描完成，共检查 %d 个子区间。\n', totalChecked);
+fprintf('扫描完成，共检查 %d 个子区间（跳过 %d 个平坦段）。\n', totalChecked, flatSkipped);
 
 if bestLen == 0
   error('未找到 R² ≥ %.4f 的线性区。请降低 R2Thresh 或 minLinearLen。', R2Thresh);
