@@ -17,6 +17,26 @@ plotDiff     = true;         % 差值图 + 斜率图 + 线性区标注
 plotR2Diag   = true;         % R² 诊断图（滑动窗口 R² + 逐点展开 R²）
 
 %% ===== 读取数据 =====
+%% ---- 读取 CSV 表头作为坐标轴标签 ----
+fid = fopen(fileV, 'r');
+if fid ~= -1
+  headerLine = fgetl(fid);
+  fclose(fid);
+  if ischar(headerLine) && ~isempty(headerLine)
+    parts = strsplit(headerLine, ',');
+    if numel(parts) >= 2
+      xLabel = strtrim(strrep(parts{1}, '"', ''));
+      yLabel = strtrim(strrep(parts{2}, '"', ''));
+    else
+      xLabel = 'X'; yLabel = 'Y';
+    end
+  else
+    xLabel = 'X'; yLabel = 'Y';
+  end
+else
+  xLabel = 'X'; yLabel = 'Y';
+end
+
 optsV = detectImportOptions(fileV); optsV.DataLines = [rowStart Inf];
 MV = readmatrix(fileV, optsV);
 
@@ -194,11 +214,15 @@ if plotOverview
   plot(t(linearStart:linearEnd)*1e9, v_fit_best*1e3, 'r--', 'LineWidth', 1.2);
   xline(t_linear_start*1e9, '--g', 'LineWidth', 1.2);
   xline(t_linear_end*1e9, '--r', 'LineWidth', 1.2);
-  text(t_linear_start*1e9, max(v)*1e3*0.95, '进入线性区', 'Color', 'g', 'FontSize', 10);
-  text(t_linear_end*1e9,   max(v)*1e3*0.85, '离开线性区', 'Color', 'r', 'FontSize', 10);
+  text(t_linear_start*1e9, v(linearStart)*1e3, ...
+    sprintf('进入 (%.3g, %.3g)', t_linear_start*1e9, v(linearStart)*1e3), ...
+    'Color', 'g', 'FontSize', 8, 'VerticalAlignment', 'top');
+  text(t_linear_end*1e9, v(linearEnd)*1e3, ...
+    sprintf('离开 (%.3g, %.3g)', t_linear_end*1e9, v(linearEnd)*1e3), ...
+    'Color', 'r', 'FontSize', 8, 'VerticalAlignment', 'bottom');
 
   legend({'原始数据', '线性区', '拟合直线', '起点', '终点'}, 'Location', 'best');
-  xlabel('Time (ns)'); ylabel('Voltage (mV)');
+  xlabel(xLabel); ylabel(yLabel);
   title(sprintf('全波形 — R²=%.6f, 线性区 idx=%d~%d', R2_best, linearStart, linearEnd));
   grid on; hold off;
 end
@@ -212,7 +236,7 @@ if plotDiff && dvIdxEnd >= dvIdxStart
   plot(t_mid(dvIdxStart:dvIdxEnd)*1e9, dv(dvIdxStart:dvIdxEnd), 'b-', 'LineWidth', 1.2);
   xline(t_linear_start*1e9, '--g', 'LineWidth', 1.2);
   xline(t_linear_end*1e9, '--r', 'LineWidth', 1.2);
-  xlabel('Time (ns)'); ylabel('dV (V/sample)');
+  xlabel(xLabel); ylabel('dV (V/sample)');
   title(sprintf('前后差值 dv(i)=v(i+1)-v(i)'));
   legend({'dv原始', '线性区'}, 'Location', 'best');
   grid on; hold off;
@@ -227,7 +251,7 @@ if plotDiff && dvIdxEnd >= dvIdxStart
     yline(slope_mean + slope_std, ':m');
     yline(slope_mean - slope_std, ':m');
   end
-  xlabel('Time (ns)'); ylabel('Slope (V/s)');
+  xlabel(xLabel); ylabel('Slope (V/s)');
   title(sprintf('斜率 dv/dt'));
   legend({'slope原始', '线性区'}, 'Location', 'best');
   grid on; hold off;
@@ -237,7 +261,7 @@ if plotDiff && dvIdxEnd >= dvIdxStart
   plot(t_mid(dvIdxStart:dvIdxEnd)*1e9, dv_smooth(dvIdxStart:dvIdxEnd), 'b-', 'LineWidth', 1.2);
   xline(t_linear_start*1e9, '--g', 'LineWidth', 1.2);
   xline(t_linear_end*1e9, '--r', 'LineWidth', 1.2);
-  xlabel('Time (ns)'); ylabel('dV smooth (V/sample)');
+  xlabel(xLabel); ylabel('dV smooth (V/sample)');
   title(sprintf('平滑差值 (movmedian win=%d)', smoothWin));
   legend({'dv平滑', '线性区'}, 'Location', 'best');
   grid on; hold off;
@@ -247,7 +271,7 @@ if plotDiff && dvIdxEnd >= dvIdxStart
   plot(t_mid(dvIdxStart:dvIdxEnd)*1e9, slope_smooth(dvIdxStart:dvIdxEnd), 'b-', 'LineWidth', 1.2);
   xline(t_linear_start*1e9, '--g', 'LineWidth', 1.2);
   xline(t_linear_end*1e9, '--r', 'LineWidth', 1.2);
-  xlabel('Time (ns)'); ylabel('Slope smooth (V/s)');
+  xlabel(xLabel); ylabel('Slope smooth (V/s)');
   title(sprintf('平滑斜率 (movmedian win=%d)', smoothWin));
   legend({'slope平滑', '线性区'}, 'Location', 'best');
   grid on; hold off;
@@ -282,7 +306,7 @@ if plotR2Diag
   yline(R2Thresh, '--r', 'LineWidth', 1.2);
   xline(t_linear_start*1e9, '--g', 'LineWidth', 1.2);
   xline(t_linear_end*1e9, '--r', 'LineWidth', 1.2);
-  xlabel('Time (ns)'); ylabel('Local R²');
+  xlabel(xLabel); ylabel('Local R²');
   title(sprintf('滑动窗口 R² (窗口=%d点) — 阈值=%.4f', winR2, R2Thresh));
   legend({'局部R²', '阈值', '线性区起点', '线性区终点'}, 'Location', 'best');
   grid on; hold off;
@@ -308,7 +332,7 @@ if plotR2Diag
   plot(t_expand*1e9, r2_expand, 'b-', 'LineWidth', 1); hold on;
   yline(R2Thresh, '--r', 'LineWidth', 1.2);
   xline(t_linear_end*1e9, '--r', 'LineWidth', 1.2);
-  xlabel('Time (ns)'); ylabel('Cumulative R²');
+  xlabel(xLabel); ylabel('Cumulative R²');
   title(sprintf('从起点(idx=%d)逐点展开的 R² — 终点 idx=%d', linearStart, linearEnd));
   legend({'累积R²', '阈值', '检测终点'}, 'Location', 'best');
   grid on; hold off;
